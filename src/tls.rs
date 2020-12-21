@@ -205,8 +205,8 @@ pub struct TlsConnectorConfig<'a, CTX> {
 impl<'a, CTX> TlsConnectorConfig<'a, CTX> {
 	/// Returns a reference to `CTX` which has been passed to the `build` method
 	/// earlier.
-	pub fn context(&self) -> &CTX {
-		&self.context
+	pub fn context(&mut self) -> &mut CTX {
+		&mut self.context
 	}
 
 	/// Returns an identity.
@@ -224,8 +224,8 @@ impl<'a, CTX> TlsConnectorConfig<'a, CTX> {
 		&self.max_protocol
 	}
 
-	pub fn root_certificates(&self) -> &Vec<Certificate<'a>, consts::U10> {
-		&self.root_certificates
+	pub fn root_certificates(&mut self) -> &mut Vec<Certificate<'a>, consts::U10> {
+		&mut self.root_certificates
 	}
 
 	pub fn accept_invalid_certs(&self) -> bool {
@@ -346,9 +346,9 @@ impl<'a> TlsConnectorBuilder<'a> {
 		self
 	}
 
-	pub fn build<'b, CTX, CONN>(&'b mut self, ctx: &'b CTX) -> Result<CONN, CONN::Error>
+	pub fn build<'b, CTX, CONN>(&'b mut self, ctx: CTX) -> Result<CONN, CONN::Error>
 	where
-		CONN: TryFrom<TlsConnectorConfig<'a, &'b CTX>>,
+		CONN: TryFrom<TlsConnectorConfig<'a, CTX>>,
 	{
 		self.context(ctx).try_into()
 	}
