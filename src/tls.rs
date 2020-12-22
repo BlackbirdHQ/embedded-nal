@@ -1,4 +1,4 @@
-use crate::{addr::HostSocketAddr, AddrType, Dns, TcpClientStack};
+use crate::{addr::HostSocketAddr, TcpClientStack};
 use core::convert::{TryFrom, TryInto};
 use heapless::{consts, Vec};
 
@@ -136,48 +136,17 @@ impl Default for Protocol {
 	}
 }
 
-trait DnsTls: Tls + Dns {
-	fn connect(
-		&self,
-		socket: &mut <Self as TcpClientStack>::TcpSocket,
-		hostname: &str,
-		connector: &Self::TlsConnector,
-	) -> nb::Result<(), <Self as Tls>::Error>;
-}
-
-impl<T> DnsTls for T
-where
-	T: Tls + Dns,
-	<T as Dns>::Error: Into<<T as Tls>::Error>,
-{
-	fn connect(
-		&self,
-		socket: &mut <Self as TcpClientStack>::TcpSocket,
-		addr: &str,
-		connector: &Self::TlsConnector,
-	) -> nb::Result<(), <Self as Tls>::Error> {
-		// TODO: Document and verify `addr`
-		let mut iter = addr.rsplitn(2, ':');
-		let hostname = iter.next().unwrap();
-		let port = iter.next().map(|p| p.parse().unwrap()).unwrap();
-
-		let remote = Dns::get_host_by_name(self, hostname, AddrType::IPv4).map_err(|e| e.into())?;
-		Tls::connect(self, socket, HostSocketAddr::new(remote, port), connector)
-	}
-}
-
 /// This trait extends implementer of TCP/IP stacks with Tls capability.
-pub trait Tls: TcpClientStack {
-	type Error: From<<Self as TcpClientStack>::Error>;
-	type TlsConnector;
+pub trait TlsConnect<T> where T: TcpClientStack {
+	type Error: From<<T as TcpClientStack>::Error>;
 
 	/// Connect securely to the given remote host and port.
 	fn connect(
-		&self,
-		socket: &mut <Self as TcpClientStack>::TcpSocket,
+		&mut self,
+		client: &T,
+		socket: &mut T::TcpSocket,
 		remote: HostSocketAddr,
-		connector: &Self::TlsConnector,
-	) -> nb::Result<(), <Self as Tls>::Error>;
+	) -> nb::Result<(), Self::Error>;
 }
 
 // A collection of TLS configuration options plus a user-defined contextual
@@ -192,7 +161,7 @@ pub trait Tls: TcpClientStack {
 // offer>.
 #[derive(Clone, Debug, Default)]
 pub struct TlsConnectorConfig<'a, CTX> {
-	context: CTX,
+	context: Option<CTX>,
 	identity: Option<Identity<'a>>,
 	min_protocol: Protocol,
 	max_protocol: Option<Protocol>,
@@ -205,13 +174,13 @@ pub struct TlsConnectorConfig<'a, CTX> {
 impl<'a, CTX> TlsConnectorConfig<'a, CTX> {
 	/// Returns a reference to `CTX` which has been passed to the `build` method
 	/// earlier.
-	pub fn context(&mut self) -> &mut CTX {
+	pub fn context(&mut self) -> &mut Option<CTX> {
 		&mut self.context
 	}
 
 	/// Returns an identity.
-	pub fn identity(&self) -> &Option<Identity<'a>> {
-		&self.identity
+	pub fn identity(&mut self) -> &mut Option<Identity<'a>> {
+		&mut self.identity
 	}
 
 	/// Returns the minimum supported protocol version.
